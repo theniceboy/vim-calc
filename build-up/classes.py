@@ -5,7 +5,7 @@ class MathSum(object):
         global eID
         self.id = eID
         eID += 1
-        self.pairStr = ""
+        self.pairChar = ""
         self.children = []
         self.power = None
         self.result = 0
@@ -35,22 +35,63 @@ class MathElement(object):
         self.children = []
         self.dividing = False
 
-def printExp(root, indent):
-    itemOrigin = root.origin
+def expandExp(root, indent):
     itemOriginID = -1
     if root.origin != None:
         itemOriginID = root.origin.id
     if type(root) == MathSum:
-        print(' '*indent + "Sum (id: " + str(root.id) + "), isDividing =", root.dividing, ", type: " + root.pairStr + " origin: " + str(itemOriginID))
+        print(' '*indent + "Sum (id: " + str(root.id) + "), isDividing =", root.dividing, ", type: " + root.pairChar + " origin: " + str(itemOriginID))
     elif type(root) == MathProduct:
         print(' '*indent + "Product (id: " + str(root.id) + "), modifier: " + str(root.modifier) + " origin: " + str(itemOriginID))
     elif type(root) == MathElement:
         print(' '*indent + "Element (id: " + str(root.id) + "): [ " + root.contentString + " ], isDividing =", root.dividing, " origin: " + str(itemOriginID))
     if root.power != None:
         print(' '*indent + ", with Power {")
-        printExp(root.power, indent + 3)
+        expandExp(root.power, indent + 3)
         print(' '*indent + "}")
     for child in root.children:
-        printExp(child, indent + 3)
+        expandExp(child, indent + 3)
 
+
+ansStr = ""
+
+
+def printExp(root):
+    global ansStr
+    ansStr = ""
+    _printExp(root)
+    print(ansStr)
+
+
+def _printExp(root):
+    global ansStr
+    if type(root) == MathSum:
+        if root.pairChar == "(":
+            ansStr += "("
+        isFirstItem = True
+        for child in root.children:
+            if isFirstItem:
+                if child.modifier == -1:
+                    ansStr += "-"
+            else:
+                ansStr += "+" if child.modifier == 1 else "-"
+            isFirstItem = False
+            _printExp(child)
+        if root.pairChar == "(":
+            ansStr += ")"
+        if root.power != None:
+            ansStr += "^"
+            _printExp(root.power)
+    elif type(root) == MathProduct:
+        isFirstItem = True
+        for child in root.children:
+            if isFirstItem == False:
+                ansStr += "/" if child.dividing == 1 else "*"
+            isFirstItem = False
+            _printExp(child)
+    else:
+        ansStr += root.contentString
+        if root.power != None:
+            ansStr += "^"
+            _printExp(root.power)
 

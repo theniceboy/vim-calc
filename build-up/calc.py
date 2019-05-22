@@ -2,6 +2,7 @@ from classes import *
 
 s = "12+67*1235(345-34)^2/9 "
 # s = "1/2 "
+# s = "sin 12 + 5"
 
 s_len = 0
 
@@ -85,25 +86,22 @@ def buildProduct(obj, startLoc, level):
         elif s[loc] == '(':
             newSum = MathSum()
             newSum.origin = obj
-            newSum.pairStr = '('
             newSum.dividing = isDividing
             obj.children.append(newSum)
-            loc = buildSum(newSum, loc + 1, pairChar = '(', level = level + 1)
-            print("sum built, loc is", loc)
+            loc = buildSum(newSum, loc + 1, '(', level=level + 1)
             if s[loc] == '^':
                 loc += 1
                 if s[loc].isnumeric():
                     newElement = MathElement()
                     newSum.power = newElement
                     newElement.origin = newSum
-                    loc = buildElement(newElement, loc, level = level + 1)
+                    loc = buildElement(newElement, loc, level=level + 1)
                 elif s[loc] == '(':
                     loc += 1
                     newSum = MathSum()
-                    newSum.pairStr = '('
                     newSum.power = newSum
                     newSum.origin = newSum
-                    loc = buildSum(newSum, loc, '(', level = level + 1)
+                    loc = buildSum(newSum, loc, '(', level=level + 1)
         elif s[loc] == ')':
             if __DEBUG_OUTPUT:
                 print("level:", level, "end of sum", "curloc:", loc)
@@ -131,19 +129,56 @@ def buildElement(obj, startLoc, level):
                 newElement = MathElement()
                 obj.power = newElement
                 newElement.origin = obj
-                loc = buildElement(newElement, loc, level = level + 1)
+                loc = buildElement(newElement, loc, level=level + 1)
             elif s[loc] == '(':
                 loc += 1
                 newSum = MathSum()
-                newSum.pairStr = '('
                 obj.power = newSum
                 newSum.origin = obj
-                loc = buildSum(newSum, loc, '(', level = level + 1)
+                loc = buildSum(newSum, loc, '(', level=level + 1)
 
     return loc
 
 
+errors = []
+def calcRoot (root):
+    # print(root.id, root)
+    # _ = input()
+    if type(root) == MathSum:
+        ans = 0
+        for child in root.children:
+            ans = ans + child.modifier * calcRoot(child)
+        if root.power != None:
+            ans = ans ** calcRoot(root.power)
+        return ans
+    elif type(root) == MathProduct:
+        ans = None
+        for child in root.children:
+            if ans == None:
+                ans = calcRoot(child)
+            else:
+                if child.dividing:
+                    dv = calcRoot(child)
+                    if dv == 0:
+                        print("divided by 0")
+                        errors.append("Dividing 0 at id=" + str(root.id))
+                        return 1
+                    else:
+                        ans = ans / dv
+                else:
+                    ans = ans * calcRoot(child)
+        return ans
+    elif type(root) == MathElement:
+        if root.power != None:
+            return root.contentNumber ** calcRoot(root.power)
+        return root.contentNumber
+
+
 # mathString = input().strip()
 expRoot = convertMathString()
-printExp(expRoot, 0)
+expandExp(expRoot, 0)
+
+print(calcRoot(expRoot))
+print(errors)
+printExp(expRoot)
 
