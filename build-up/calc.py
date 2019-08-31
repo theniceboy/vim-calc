@@ -1,14 +1,29 @@
 import sys
+import math
+import argparse
+
+# parser = argparse.ArgumentParser()
+# parser.add_argument("str")
+# args = parser.parse_args()
+
+# s = args.str
 
 # s = input()
-s = sys.argv[1]
-s = s + ' '
+# s = "(2+4)*5^3"
+# s = sys.argv[1]
+# s = "pi*((1-3)^4-15+((9-8)))"
+# s = "sqrt(8*sin(pi/6)+12)"
+s = "(sqrt(4+6pi)+3)^4/5+ln 4-3"
+s = s + '_'
 
 # s = "12+67*1235(345-34)^2/9 "
 # s = "1/2 "
 # s = "sin 12 + 5"
 
 s_len = 0
+s_start = 0
+s_end = 0
+s_should_end = False
 
 __DEBUG_PAUSE = False
 __DEBUG_OUTPUT = False
@@ -23,9 +38,9 @@ class MathSum(object):
         eID += 1
         self.pairChar = ""
         self.children = []
-        self.power = None
         self.result = 0
         self.origin = None
+        self.power = None
         self.dividing = False
 
 
@@ -49,6 +64,7 @@ class MathElement(object):
         self.contentNumber = 0
         self.origin = None
         self.power = None
+        self.powerModifier = 1
         self.children = []
         self.dividing = False
 
@@ -79,12 +95,9 @@ def printExp(root):
     _printExp(root)
     print(ansStr)
 
-
 def _printExp(root):
     global ansStr
     if type(root) == MathSum:
-        if root.pairChar == "(":
-            ansStr += "("
         isFirstItem = True
         for child in root.children:
             if isFirstItem:
@@ -96,9 +109,6 @@ def _printExp(root):
             _printExp(child)
         if root.pairChar == "(":
             ansStr += ")"
-        if root.power != None:
-            ansStr += "^"
-            _printExp(root.power)
     elif type(root) == MathProduct:
         isFirstItem = True
         for child in root.children:
@@ -106,14 +116,47 @@ def _printExp(root):
                 ansStr += "/" if child.dividing == 1 else "*"
             isFirstItem = False
             _printExp(child)
-    else:
-        ansStr += root.contentString
+    elif type(root) == MathElement:
+        if root.contentString == '(':
+            ansStr += '('
+            _printExp(root.children[0])
+            ansStr += ')'
+        else:
+            ansStr += root.contentString
+            if len(root.children) > 0:
+                _printExp(root.children[0])
         if root.power != None:
             ansStr += "^"
             _printExp(root.power)
 
+scientificNumbers = {'pi': math.pi, \
+                     'e' : math.e}
+def isScientific(loc):
+    global s
+    str = s[loc:loc+5].lower()
+    if str == 'log10':
+        return (True, str, True)
+    str = str[:-1]
+    if str == 'log2' or \
+       str == 'sqrt':
+        return (True, str, True)
+    str = str[:-1]
+    if str == 'sin' or \
+       str == 'cos' or \
+       str == 'tan':
+        return (True, str, True)
+    str = str[:-1]
+    if str == 'ln':
+        return (True, str, True)
+    if str == 'pi':
+        return (True, str, False)
+    str = str[:-1]
+    if str == 'e':
+        return (True, str, False)
+    return (False, '', False)
+
 def convertMathString():
-    global s, s_len
+    global s, s_len, s_start, s_end
     # print(s)
     s_len = len(s)
     # print(s_len)
@@ -123,50 +166,67 @@ def convertMathString():
 
 
 def buildSum(obj, startLoc, pairChar, level):
+    print("__pairchar:", pairChar)
     global s, s_len
     loc = startLoc
     obj.pairChar = pairChar
     while True:
         if __DEBUG_OUTPUT:
-            print("level:", level, "summing", loc, s[loc])
+            print("level:", level, "summing, loc:", loc, s[loc])
         if __DEBUG_PAUSE:
             _ = input()
             print("sum pause inputed")
-        if s[loc] == ' ':
+
+        if s[loc] == '_':
             return loc
+        elif s[loc] == ' ':
+            loc += 1
+            continue
         if loc > s_len - 1:
             break
         newProduct = MathProduct()
         newProduct.origin = obj
         obj.children.append(newProduct)
+
         if __DEBUG_OUTPUT:
-            print("level:", level, "___add child", obj.children)
+            print("level:", level, "___add child, loc:", loc, obj.children)
+
         if s[loc] == '-':
             newProduct.modifier = -1
             loc += 1
-        if s[loc] == '+':
+        elif s[loc] == '+':
             loc += 1
+
         if __DEBUG_OUTPUT:
-            print("level:", level, "will_build_product")
-        loc = buildProduct(newProduct, loc, level + 1)
-        if s[loc] == ')':
+            print("level:", level, "loc:", loc, "will_build_product")
+
+        loc = buildProduct(newProduct, loc, level+1)
+
+        print("loc:", loc, "sloc:", s[loc], "pairchar:", pairChar)
+        if s[loc] == pairChar:
             loc = loc + 1
             if __DEBUG_OUTPUT:
-                print("level:", level, "End of Sum", "curloc:", loc)
+                print("level:", level, "End of Sum", "loc:", loc)
             return loc
+
+        if pairChar == 'oneProductAllowed':
+            break
 
     return loc
 
 
 def buildProduct(obj, startLoc, level):
-    global s, s_len
+    global s, s_len, s_should_end
     loc = startLoc
     isDividing = False
     while True:
         if __DEBUG_OUTPUT:
-            print("level:", level, "producting", loc, s[loc])
-        if s[loc] == ' ':
+            print("level:", level, "producting, loc:", loc, s[loc])
+        if s[loc] == '_':
             return loc
+        if s[loc] == ' ':
+            loc += 1
+            continue
         if __DEBUG_PAUSE:
             _ = input()
             print("product pause inputed")
@@ -174,12 +234,20 @@ def buildProduct(obj, startLoc, level):
             break
         elif s[loc] == '+' or s[loc] == '-':
             break
-        elif s[loc].isnumeric():
+        elif s[loc].isnumeric() or s[loc] == '.':
             newElement = MathElement()
             newElement.origin = obj
             newElement.dividing = isDividing
             obj.children.append(newElement)
-            loc = buildElement(newElement, loc, level + 1)
+            loc = buildElement(newElement, loc, level+1)
+        elif s[loc].isalpha():
+            scientific = isScientific(loc)
+            if scientific[0]:
+                newElement = MathElement()
+                newElement.origin = obj
+                newElement.dividing = isDividing
+                obj.children.append(newElement)
+                loc = buildElement(newElement, loc, level=level+1)
         elif s[loc] == '*':
             isDividing = False
             loc += 1
@@ -187,58 +255,75 @@ def buildProduct(obj, startLoc, level):
             isDividing = True
             loc += 1
         elif s[loc] == '(':
-            newSum = MathSum()
-            newSum.origin = obj
-            newSum.dividing = isDividing
-            obj.children.append(newSum)
-            loc = buildSum(newSum, loc + 1, '(', level=level + 1)
-            if s[loc] == '^':
-                loc += 1
-                if s[loc].isnumeric():
-                    newElement = MathElement()
-                    newSum.power = newElement
-                    newElement.origin = newSum
-                    loc = buildElement(newElement, loc, level=level + 1)
-                elif s[loc] == '(':
-                    loc += 1
-                    newSum = MathSum()
-                    newSum.power = newSum
-                    newSum.origin = newSum
-                    loc = buildSum(newSum, loc, '(', level=level + 1)
+            newElement = MathElement()
+            newElement.origin = obj
+            newElement.dividing = isDividing
+            obj.children.append(newElement)
+            loc = buildElement(newElement, loc, level=level+1)
         elif s[loc] == ')':
             if __DEBUG_OUTPUT:
-                print("level:", level, "end of sum", "curloc:", loc)
+                print("level:", level, "end of sum", "loc:", loc)
             return loc
 
     return loc
 
 
 def buildElement(obj, startLoc, level):
-    global s, s_len
+    global s, s_len, s_should_end
     loc = startLoc
+    isElement = False
+    scientific = isScientific(loc)
+    if s[loc] == '(':
+        obj.contentString = '('
+        newSum = MathSum()
+        newSum.origin = obj
+        obj.children.append(newSum)
+        loc = buildSum(newSum, loc+1, ')', level=level+1)
     if s[loc].isnumeric():
-        while s[loc].isnumeric():
+        hasDot = False
+        while s[loc].isnumeric() or s[loc] == '.':
+            if s[loc] == '.':
+                if hasDot:
+                    break
+                else:
+                    hasDot = True
             loc += 1
             if loc >= s_len:
                 break
         obj.contentString = s[startLoc:loc]
         obj.contentNumber = int(obj.contentString)
-        if s[loc] == ' ':
-            return loc
-        # Check if a 'power' operation if encountered
-        if s[loc] == '^':
-            loc += 1
-            if s[loc].isnumeric():
+    elif scientific[0]:
+        loc += len(scientific[1])
+        obj.contentString = scientific[1]
+        if scientific[2]:
+            if s[loc] == '(':
                 newElement = MathElement()
-                obj.power = newElement
                 newElement.origin = obj
-                loc = buildElement(newElement, loc, level=level + 1)
-            elif s[loc] == '(':
-                loc += 1
-                newSum = MathSum()
-                obj.power = newSum
-                newSum.origin = obj
-                loc = buildSum(newSum, loc, '(', level=level + 1)
+                obj.children.append(newElement)
+                loc = buildElement(newElement, loc, level=level+1)
+            else:
+                newProduct = MathProduct()
+                newProduct.origin = obj
+                obj.children.append(newProduct)
+                loc = buildProduct(newProduct, loc, level=level+1)
+        else:
+            obj.contentNumber = scientificNumbers[scientific[1]]
+    else:
+        s_should_end = False
+
+    if s[loc] == '_':
+        return loc
+    if s[loc] == '^':
+        loc += 1
+        powerModifier = 1
+        if s[loc] == '-':
+            powerModifier = -1
+            loc += 1
+        newElement = MathElement()
+        newElement.origin = obj
+        obj.power = newElement
+        obj.powerModifier = powerModifier
+        loc = buildElement(newElement, loc, level=level+1)
 
     return loc
 
@@ -251,8 +336,6 @@ def calcRoot (root):
         ans = 0
         for child in root.children:
             ans = ans + child.modifier * calcRoot(child)
-        if root.power != None:
-            ans = ans ** calcRoot(root.power)
         return ans
     elif type(root) == MathProduct:
         ans = None
@@ -263,7 +346,6 @@ def calcRoot (root):
                 if child.dividing:
                     dv = calcRoot(child)
                     if dv == 0:
-                        print("divided by 0")
                         errors.append("Dividing 0 at id=" + str(root.id))
                         return 1
                     else:
@@ -272,16 +354,45 @@ def calcRoot (root):
                     ans = ans * calcRoot(child)
         return ans
     elif type(root) == MathElement:
+        ans = root.contentNumber
+        child_ans = 0
+        rootstr = root.contentString
+        if len(root.children) > 0:
+            child_ans = calcRoot(root.children[0])
+        if rootstr == '(':
+            ans = child_ans
+        if rootstr == 'sin':
+            ans = math.sin(child_ans)
+        elif rootstr == 'cos':
+            ans = math.cos(child_ans)
+        elif rootstr == 'tan':
+            ans = math.tan(child_ans)
+        elif rootstr == 'ln':
+            ans = math.log(child_ans)
+        elif rootstr == 'log2':
+            ans = math.log2(child_ans)
+        elif rootstr == 'log10':
+            ans = math.log10(child_ans)
+        elif rootstr == 'sqrt':
+            ans = math.sqrt(child_ans)
         if root.power != None:
-            return root.contentNumber ** calcRoot(root.power)
-        return root.contentNumber
+            return ans ** calcRoot(root.power)
+        return ans
 
 
 # mathString = input().strip()
 expRoot = convertMathString()
-# expandExp(expRoot, 0)
 
-print(calcRoot(expRoot))
+ans = calcRoot(expRoot)
+printExp(expRoot)
+expandExp(expRoot, 0)
+
+if len(errors) > 0:
+    print(0)
+    print(errors)
+else:
+    print(1)
+    print(ans)
 # print(errors)
 # printExp(expRoot)
 

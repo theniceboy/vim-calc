@@ -1,8 +1,7 @@
 function Calc()
-  "echo getline(".")
-  let s:s = getline(".")
-  " echo s:s
-  silent! let s:result = trim(system("python3 ~/Github/vim-calc/build-up/calc.py " . s:s))
-  echo "Result: " . str2nr(s:result)
-  "s:result
+  "let s = substitute(getline("."), ' ', '', 'g')
+  let s = getline(".")
+  let calc_str = "python3 ~/Github/vim-calc/build-up/calc.py \"" . s . "\""
+  let result = trim(system(calc_str))
+  echo result
 endfunc
