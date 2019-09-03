@@ -22,6 +22,9 @@ Install `vim-calc` with [vim-plug](https://github.com/junegunn/vim-plug):
 Plug 'theniceboy/vim-calc'
 ```
 
+#### Todos
+- [ ] Convert equation to `latex` form
+
 #### Contributing
 This plugin is **under development** so if you found a bug or have a suggestion, please **DO NOT HESITATE** to [file an issue](https://github.com/theniceboy/vim-calc/issues/new), submit a Pull Request, or email me!
 
