@@ -1,19 +1,14 @@
 import sys
 import math
-import argparse
-
-# parser = argparse.ArgumentParser()
-# parser.add_argument("str")
-# args = parser.parse_args()
-
-# s = args.str
 
 # s = input()
-# s = "(2+4)*5^3"
-# s = sys.argv[1]
+# s = "(2+4)5^3"
 # s = "pi*((1-3)^4-15+((9-8)))"
 # s = "sqrt(8*sin(pi/6)+12)"
-s = "(sqrt(4+6pi)+3)^4/5+ln 4-3"
+# s = "(sqrt(4+6pi)+3)^4/5+ln 4-3"
+# s = "3.1415926/p"
+# s = "(ln e^3)4"
+s = sys.argv[1]
 s = s + '_'
 
 # s = "12+67*1235(345-34)^2/9 "
@@ -24,6 +19,9 @@ s_len = 0
 s_start = 0
 s_end = 0
 s_should_end = False
+
+# __DEBUG_PAUSE = True
+# __DEBUG_OUTPUT = True
 
 __DEBUG_PAUSE = False
 __DEBUG_OUTPUT = False
@@ -93,7 +91,7 @@ def printExp(root):
     global ansStr
     ansStr = ""
     _printExp(root)
-    print(ansStr)
+    return ansStr
 
 def _printExp(root):
     global ansStr
@@ -124,6 +122,11 @@ def _printExp(root):
         else:
             ansStr += root.contentString
             if len(root.children) > 0:
+                try:
+                    if root.children[0].contentString != "(":
+                        ansStr += " "
+                except:
+                    ansStr += " "
                 _printExp(root.children[0])
         if root.power != None:
             ansStr += "^"
@@ -133,17 +136,14 @@ scientificNumbers = {'pi': math.pi, \
                      'e' : math.e}
 def isScientific(loc):
     global s
-    str = s[loc:loc+5].lower()
-    if str == 'log10':
-        return (True, str, True)
-    str = str[:-1]
-    if str == 'log2' or \
-       str == 'sqrt':
+    str = s[loc:loc+4].lower().ljust(4, '-')
+    if str == 'sqrt':
         return (True, str, True)
     str = str[:-1]
     if str == 'sin' or \
        str == 'cos' or \
-       str == 'tan':
+       str == 'tan' or \
+       str == 'log':
         return (True, str, True)
     str = str[:-1]
     if str == 'ln':
@@ -166,11 +166,10 @@ def convertMathString():
 
 
 def buildSum(obj, startLoc, pairChar, level):
-    print("__pairchar:", pairChar)
-    global s, s_len
+    global s, s_len, s_should_end
     loc = startLoc
     obj.pairChar = pairChar
-    while True:
+    while not s_should_end:
         if __DEBUG_OUTPUT:
             print("level:", level, "summing, loc:", loc, s[loc])
         if __DEBUG_PAUSE:
@@ -202,7 +201,6 @@ def buildSum(obj, startLoc, pairChar, level):
 
         loc = buildProduct(newProduct, loc, level+1)
 
-        print("loc:", loc, "sloc:", s[loc], "pairchar:", pairChar)
         if s[loc] == pairChar:
             loc = loc + 1
             if __DEBUG_OUTPUT:
@@ -216,20 +214,20 @@ def buildSum(obj, startLoc, pairChar, level):
 
 
 def buildProduct(obj, startLoc, level):
-    global s, s_len, s_should_end
+    global s, s_len, s_should_end, errors
     loc = startLoc
     isDividing = False
-    while True:
+    while not s_should_end:
         if __DEBUG_OUTPUT:
             print("level:", level, "producting, loc:", loc, s[loc])
+        if __DEBUG_PAUSE:
+            _ = input()
+            print("product pause inputed")
         if s[loc] == '_':
             return loc
         if s[loc] == ' ':
             loc += 1
             continue
-        if __DEBUG_PAUSE:
-            _ = input()
-            print("product pause inputed")
         if loc >= s_len:
             break
         elif s[loc] == '+' or s[loc] == '-':
@@ -248,6 +246,9 @@ def buildProduct(obj, startLoc, level):
                 newElement.dividing = isDividing
                 obj.children.append(newElement)
                 loc = buildElement(newElement, loc, level=level+1)
+            else:
+                errors.append("Unrecognized symbol at location " + str(loc))
+                s_should_end = True
         elif s[loc] == '*':
             isDividing = False
             loc += 1
@@ -264,34 +265,43 @@ def buildProduct(obj, startLoc, level):
             if __DEBUG_OUTPUT:
                 print("level:", level, "end of sum", "loc:", loc)
             return loc
+        else:
+            errors.append("Unrecognized symbol at location " + str(loc))
+            s_should_end = True
 
     return loc
 
 
 def buildElement(obj, startLoc, level):
-    global s, s_len, s_should_end
+    global s, s_len, s_should_end, errors
     loc = startLoc
     isElement = False
     scientific = isScientific(loc)
+    if __DEBUG_OUTPUT:
+        print("level:", level, "building element, loc:", loc, s[loc], "science:", scientific)
+    if __DEBUG_PAUSE:
+        _ = input()
+        print("element pause inputed")
     if s[loc] == '(':
         obj.contentString = '('
         newSum = MathSum()
         newSum.origin = obj
         obj.children.append(newSum)
         loc = buildSum(newSum, loc+1, ')', level=level+1)
-    if s[loc].isnumeric():
+    elif s[loc].isnumeric():
         hasDot = False
         while s[loc].isnumeric() or s[loc] == '.':
             if s[loc] == '.':
                 if hasDot:
-                    break
+                    errors.append("Multiple dots in one number at location " + str(loc))
+                    s_should_end = True
                 else:
                     hasDot = True
             loc += 1
             if loc >= s_len:
                 break
         obj.contentString = s[startLoc:loc]
-        obj.contentNumber = int(obj.contentString)
+        obj.contentNumber = float(obj.contentString)
     elif scientific[0]:
         loc += len(scientific[1])
         obj.contentString = scientific[1]
@@ -309,6 +319,7 @@ def buildElement(obj, startLoc, level):
         else:
             obj.contentNumber = scientificNumbers[scientific[1]]
     else:
+        errors.append("Missing math element at location: " + str(loc))
         s_should_end = False
 
     if s[loc] == '_':
@@ -332,6 +343,7 @@ errors = []
 def calcRoot (root):
     # print(root.id, root)
     # _ = input()
+    global errors
     if type(root) == MathSum:
         ans = 0
         for child in root.children:
@@ -369,9 +381,9 @@ def calcRoot (root):
             ans = math.tan(child_ans)
         elif rootstr == 'ln':
             ans = math.log(child_ans)
-        elif rootstr == 'log2':
-            ans = math.log2(child_ans)
-        elif rootstr == 'log10':
+        # elif rootstr == 'log2':
+            # ans = math.log2(child_ans)
+        elif rootstr == 'log':
             ans = math.log10(child_ans)
         elif rootstr == 'sqrt':
             ans = math.sqrt(child_ans)
@@ -383,16 +395,18 @@ def calcRoot (root):
 # mathString = input().strip()
 expRoot = convertMathString()
 
-ans = calcRoot(expRoot)
-printExp(expRoot)
-expandExp(expRoot, 0)
+# print(printExp(expRoot))
+# expandExp(expRoot, 0)
 
 if len(errors) > 0:
-    print(0)
-    print(errors)
+    print(0, '\\', errors[0])
 else:
-    print(1)
-    print(ans)
+    ans = calcRoot(expRoot)
+    if len(errors) > 0:
+        print(0, '\\', errors[0])
+    else:
+        printExp(expRoot)
+        print(1, '\\', ans, '\\', ansStr)
 # print(errors)
 # printExp(expRoot)
 
