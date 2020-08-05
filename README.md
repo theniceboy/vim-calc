@@ -1,5 +1,7 @@
 ## vim-calc: A Calculator in Vim
 
+[中文版](./README_cn.md)
+
 #### Introduction
 `vim-calc` is a fully functional calculator that you might feel missing in `Vim`.
 
